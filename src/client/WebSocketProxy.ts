@@ -13,24 +13,21 @@ export class WebSocketProxy implements IWebSocketProxy {
 
     }
 
-    private _ws?: WebSocket;
+    private _ws?: UniApp.SocketTask;
     connect(server: string, protocols?: string[]): void {
-        if (this.caUrl) {
-            // @ts-ignore
-            this._ws = new WebSocket(server, protocols, this.caUrl);
-        }
-        else {
-            this._ws = new WebSocket(server, protocols);
-        }
-        this._ws.binaryType = 'arraybuffer';
+        this._ws = uni.connectSocket({
+            url: server,
+            protocols: protocols,
+            success: () => {},
+        });
 
-        this._ws.onopen = this.options.onOpen;
-        this._ws.onerror = this.options.onError;
-        this._ws.onclose = e => {
+        this._ws.onOpen(this.options.onOpen);
+        this._ws.onError(this.options.onError);
+        this._ws.onClose((e) => {
             this.options.onClose(e.code, e.reason);
             this._ws = undefined;
-        }
-        this._ws.onmessage = e => {
+        })
+        this._ws.onMessage((e) => {
             if (e.data instanceof ArrayBuffer) {
                 this.options.onMessage(new Uint8Array(e.data));
             }
@@ -40,10 +37,10 @@ export class WebSocketProxy implements IWebSocketProxy {
             else {
                 this.options.logger?.warn('[Unresolved Recv]', e.data)
             }
-        }
+        })
     }
     close(code?: number, reason?: string): void {
-        this._ws?.close(code, reason);
+        this._ws?.close({ code, reason });
         this._ws = undefined;
     }
     async send(data: string | Uint8Array): Promise<{ err?: TsrpcError | undefined; }> {
@@ -62,7 +59,7 @@ export class WebSocketProxy implements IWebSocketProxy {
                 }
             }
 
-            this._ws!.send(sendData);
+            this._ws!.send({ data: sendData });
             return {};
         }
         catch (err) {
